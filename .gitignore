@@ -1,0 +1,60 @@
+# Ignoriere Build-Ordner in allen Paketen
+**/build/
+**/build_isolated/
+
+# Ignoriere CMake generierte Dateien
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+
+# Ignoriere temporäre Dateien und Log-Dateien
+**/*.log
+**/*.tmp
+**/.DS_Store
+
+# Ignoriere Python Bytecode und Cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Ignoriere temporäre Dateien von IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Ignoriere ROS-Build- und Log-Ordner, falls ROS verwendet wird
+**/devel/
+**/devel_isolated/
+**/install/
+**/install_isolated/
+**/logs/
+
+
+# gtsam spezifische Regeln integriert
+**/gtsam/build*
+**/gtsam/debug*
+**/gtsam/.idea
+**/gtsam/*.pyc
+**/gtsam/*.DS_Store
+**/gtsam/*.swp
+**/gtsam/examples/Data/dubrovnik-3-7-pre-rewritten.txt
+**/gtsam/examples/Data/pose2example-rewritten.txt
+**/gtsam/examples/Data/pose3example-rewritten.txt
+**/gtsam/*.txt.user
+**/gtsam/*.txt.user.6d59f0c
+**/gtsam/*.pydevproject
+**/gtsam/.vscode
+**/gtsam/.env
+**/gtsam/.vs/
+**/gtsam/CMakeSettings.json
+**/gtsam/CMakeLists.txt.user*
+**/gtsam/xcode/
+**/gtsam/Dockerfile
+**/gtsam/python/gtsam/notebooks/.ipynb_checkpoints/ellipses-checkpoint.ipynb
+**/gtsam/.cache/
+
+
+# Spezifische Regel für die zu ignorierende Datei im .settings-Ordner von gtsam
+**/gtsam/.settings/org.eclipse.cdt.codan.core.prefs
