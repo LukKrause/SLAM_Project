@@ -11,9 +11,9 @@
 namespace radar_graph_slam {
 
 KeyFrame::KeyFrame(const size_t index, const ros::Time& stamp, const Eigen::Isometry3d& odom_scan2scan, double accum_distance, const pcl::PointCloud<PointT>::ConstPtr& cloud) : 
-  index(index), stamp(stamp), odom_scan2scan(odom_scan2scan), accum_distance(accum_distance), cloud(cloud), node(nullptr) {}
+  index(index), stamp(stamp), odom_scan2scan(odom_scan2scan), accum_distance(accum_distance), cloud(cloud), node(nullptr), filtered(false) {}
 
-KeyFrame::KeyFrame(const std::string& directory, g2o::HyperGraph* graph) : stamp(), odom_scan2scan(Eigen::Isometry3d::Identity()), accum_distance(-1), cloud(nullptr), node(nullptr) {
+KeyFrame::KeyFrame(const std::string& directory, g2o::HyperGraph* graph) : stamp(), odom_scan2scan(Eigen::Isometry3d::Identity()), accum_distance(-1), cloud(nullptr), node(nullptr), filtered(false) {
   load(directory, graph);
 }
 
@@ -54,6 +54,8 @@ void KeyFrame::save(const std::string& directory) {
   if(node) {
     ofs << "id " << node->id() << "\n";
   }
+
+  ofs << "filtered " << filtered << "\n";
 
   pcl::io::savePCDFileBinary(directory + "/cloud.pcd", *cloud);
 }
@@ -114,6 +116,8 @@ bool KeyFrame::load(const std::string& directory, g2o::HyperGraph* graph) {
       orientation = quat;
     } else if(token == "id") {
       ifs >> node_id;
+    } else if (token == "filtered") {
+      ifs >> filtered;
     }
   }
 

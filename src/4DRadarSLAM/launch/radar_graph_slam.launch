@@ -6,7 +6,7 @@
   
   <!-- arguments -->
   <arg name="nodelet_manager" default="radarslam_nodelet_manager" />
-  <arg name="enable_floor_detection" default="false" />
+  <arg name="enable_floor_detection" default="true" />
   <arg name="enable_barometer" default="false" /> <!-- barometer altitude constraint, not used -->
   <arg name="barometer_edge_type" default="1" /> <!-- not used -->
   <arg name="enable_gps" default="false" />
@@ -19,7 +19,7 @@
   <arg name="keyframe_delta_angle" default="0.2612" /><!-- 10°: 0.1745 15°: 0.2612 -->
 
   <arg name="enable_transform_thresholding" default="true" />
-  <arg name="enable_loop_closure" default="false" />
+  <arg name="enable_loop_closure" default="true" />
   
   <!-- ICP NDT_OMP FAST_GICP FAST_APDGICP FAST_VGICP   -->
   <arg name="registration_method" default="FAST_APDGICP" />
@@ -39,6 +39,8 @@
 
   <!-- radar_preprocessing_nodelet -->
   <node pkg="nodelet" type="nodelet" name="radar_preprocessing_nodelet" args="load radar_graph_slam/PreprocessingNodelet $(arg nodelet_manager)">
+    <!-- subsurface point filter -->
+    <param name="subsurface_removal_filter" value="true" />
     <!-- distance filter -->
     <param name="use_distance_filter" value="true" />
     <param name="distance_near_thresh" value="2" />
@@ -61,7 +63,7 @@
     <!-- Ego Velocity Estimation -->
     <param name="enable_dynamic_object_removal" value="$(arg enable_dynamic_object_removal)" />
     <!-- ground truth publication -->
-    <param name="gt_file_location" value="/home/lukas-krause/Datasets/Radar_SLAM/carpark_single/gt_odom.txt" />
+    <param name="gt_file_location" value="/home/lukas-krause/Datasets/gt_odom.txt" /> <!--Radar_SLAM/carpark_single-->
   </node>
 
 

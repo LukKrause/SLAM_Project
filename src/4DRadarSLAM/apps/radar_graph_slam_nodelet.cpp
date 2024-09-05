@@ -18,6 +18,7 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/registration/icp.h>
 #include <pcl/octree/octree_search.h>
+#include <pcl/filters/passthrough.h>
 
 #include <ros/ros.h>
 #include <geodesy/utm.h>
@@ -98,6 +99,7 @@ public:
     initial_pose.setIdentity();
 
     max_keyframes_per_update = private_nh.param<int>("max_keyframes_per_update", 10);
+    subsurface_removal_filter = private_nh.param<bool>("subsurface_removal_filter", true);
 
     anchor_node = nullptr;
     anchor_edge = nullptr;
@@ -141,16 +143,16 @@ public:
     sync->registerCallback(boost::bind(&RadarGraphSlamNodelet::cloud_callback, this, _1, _2));
     
     if(private_nh.param<bool>("enable_gps", true)) {
-      gps_sub = mt_nh.subscribe("/gps/geopoint", 1024, &RadarGraphSlamNodelet::gps_callback, this);
-      nmea_sub = mt_nh.subscribe("/gpsimu_driver/nmea_sentence", 1024, &RadarGraphSlamNodelet::nmea_callback, this);
-      navsat_sub = mt_nh.subscribe(gpsTopic, 1024, &RadarGraphSlamNodelet::navsat_callback, this);
+      //gps_sub = mt_nh.subscribe("/gps/geopoint", 1024, &RadarGraphSlamNodelet::gps_callback, this);
+      //nmea_sub = mt_nh.subscribe("/gpsimu_driver/nmea_sentence", 1024, &RadarGraphSlamNodelet::nmea_callback, this);
+      //navsat_sub = mt_nh.subscribe(gpsTopic, 1024, &RadarGraphSlamNodelet::navsat_callback, this);
     }
-    if(private_nh.param<bool>("enable_barometer", false)) {
-      barometer_sub = mt_nh.subscribe("/barometer/filtered", 16, &RadarGraphSlamNodelet::barometer_callback, this);
+    if(private_nh.param<bool>("enable_barometer", true)) {
+      //barometer_sub = mt_nh.subscribe("/barometer/filtered", 16, &RadarGraphSlamNodelet::barometer_callback, this);
     }
     if (enable_preintegration)
-      imu_odom_sub = nh.subscribe("/imu_pre_integ/imu_odom_incre", 1024, &RadarGraphSlamNodelet::imu_odom_callback, this);
-    imu_sub = nh.subscribe("/imu", 1024, &RadarGraphSlamNodelet::imu_callback, this);
+      //imu_odom_sub = nh.subscribe("/imu_pre_integ/imu_odom_incre", 1024, &RadarGraphSlamNodelet::imu_odom_callback, this);
+    //imu_sub = nh.subscribe("/imu", 1024, &RadarGraphSlamNodelet::imu_callback, this);
     command_sub = nh.subscribe("/command", 10, &RadarGraphSlamNodelet::command_callback, this);
 
     //***** publishers ******
@@ -263,6 +265,51 @@ private:
       odom_frame2frame_pub.publish(odom_frame2frame);
       keyframe->trans_integrated = transf_integ;
     }
+    
+    /*static bool first_iteration = true;
+
+    // Filter keyframe for subsurface points
+    if (subsurface_removal_filter) {
+        if (!first_iteration) {
+            cout << "Subsurface removal filter is active" << endl;
+
+            // Filter the point cloud based on the height of the baselink frame
+            static tf::TransformListener listener;
+            tf::StampedTransform transform;
+            try {
+                listener.lookupTransform(mapFrame, baselinkFrame, ros::Time(0), transform);
+            } catch (tf::TransformException &ex) {
+                ROS_WARN("%s", ex.what());
+                return;
+            }
+
+            // Get the z-coordinate of the baselink frame
+            double baselink_z = transform.getOrigin().z();
+      
+            size_t num_points_before = keyframe->cloud->size();
+
+            // Filter the point cloud of the keyframe based on the height of the baselink frame
+            pcl::PassThrough<PointT> pass;
+            pass.setInputCloud(keyframe->cloud);
+            pass.setFilterFieldName("z");
+            pass.setFilterLimits(baselink_z - 0.1, std::numeric_limits<float>::max()); // Set the lower limit to baselink_z
+            pcl::PointCloud<PointT>::Ptr filtered_cloud(new pcl::PointCloud<PointT>());
+            pass.filter(*filtered_cloud);
+
+            keyframe->cloud = filtered_cloud;
+            keyframe->filtered = true;
+
+            size_t num_points_after = keyframe->cloud->size();
+            if (num_points_before != num_points_after)
+                cout << "Number of points filtered: " << num_points_before - num_points_after << endl;
+        } else {
+            cout << "Skipping subsurface removal filter in the first iteration" << endl;
+        }
+
+        // Setze first_iteration auf false nach der ersten Ausführung
+        first_iteration = false;
+        cout << "first_iteration done" << endl;
+    }*/
 
     std::lock_guard<std::mutex> lock(keyframe_queue_mutex);
     keyframe_queue.push_back(keyframe);
@@ -290,7 +337,7 @@ private:
   }
 
 
-  void imu_callback(const sensor_msgs::ImuConstPtr& imu_odom_msg) {
+  /*void imu_callback(const sensor_msgs::ImuConstPtr& imu_odom_msg) {
     // Transform to Radar's Frame
     geometry_msgs::QuaternionStamped::Ptr imu_quat(new geometry_msgs::QuaternionStamped);
     imu_quat->quaternion = imu_odom_msg->orientation;
@@ -330,7 +377,7 @@ private:
     std::lock_guard<std::mutex> lock(keyframe_queue_mutex);
     imu_odom_queue.push_back(imu_odom_msg);
     }
-  }
+  }*/
 
   geometry_msgs::Transform preIntegrationTransform(){
     double lastImuOdomQT = -1;
@@ -438,7 +485,7 @@ private:
   }
 
 
-  void barometer_callback(const barometer_bmp388::BarometerPtr& baro_msg) {
+  /*void barometer_callback(const barometer_bmp388::BarometerPtr& baro_msg) {
     if(!enable_barometer) {
       return;
     }
@@ -514,7 +561,7 @@ private:
     auto remove_loc = std::upper_bound(barometer_queue.begin(), barometer_queue.end(), keyframes.back()->stamp, [=](const ros::Time& stamp, const barometer_bmp388::BarometerConstPtr& baropoint) { return stamp < baropoint->header.stamp; });
     barometer_queue.erase(barometer_queue.begin(), remove_loc);
     return updated;
-  }
+  }*/
 
   /**
    * @brief this method adds all the keyframes_ in #keyframe_queue to the pose graph (odometry edges)
@@ -531,6 +578,56 @@ private:
     Eigen::Isometry3d odom2map(trans_odom2map.cast<double>());
     trans_odom2map_mutex.unlock();
 
+    // Filtering keyframes: Points under the baselink frame are removed (Points under groundlevel)
+    /*static tf::TransformListener listener;
+    bool output_once = false;
+
+    int num_processed = 0;
+    cout << "keyframe_queue size: " << keyframe_queue.size() << endl;
+    // ********** Select number of keyframes to be optimized **********
+    for(int i = 0; i < std::min<int>(keyframe_queue.size(), max_keyframes_per_update); i++) {
+      num_processed = i;
+
+      const auto& keyframe = keyframe_queue[i];
+      cout << "num_processed: " << num_processed << endl;
+  
+      // Skip already filtered keyframes
+      if (!keyframe->filtered) {
+        cout << "testtest: " << endl;
+        tf::StampedTransform transform;
+        try {
+          listener.lookupTransform(mapFrame, baselinkFrame, ros::Time(0), transform);
+        } catch (tf::TransformException &ex) {
+          ROS_WARN("%s", ex.what());
+          continue;
+        }
+
+        // Get the z-coordinate of the baselink frame
+        double baselink_z = transform.getOrigin().z();
+        if (!output_once) {
+          cout << "Removing Points under z: " << baselink_z - 0.1 << endl;
+          output_once = true;
+        }
+        size_t num_points_before = keyframe->cloud->size();
+
+        // Filter the point cloud of the keyframe based on the height of the baselink frame
+        pcl::PassThrough<PointT> pass;
+        pass.setInputCloud(keyframe->cloud);
+        pass.setFilterFieldName("z");
+        pass.setFilterLimits(baselink_z - 0.1, std::numeric_limits<float>::max()); // Set the lower limit to baselink_z
+        pcl::PointCloud<PointT>::Ptr filtered_cloud(new pcl::PointCloud<PointT>());
+        pass.filter(*filtered_cloud);
+
+        // Update the keyframe's cloud with the filtered cloud
+        keyframe->cloud = filtered_cloud;
+        size_t num_points_after = keyframe->cloud->size();
+        if (num_points_before != num_points_after)
+          cout << "Number of Keyframe points filtered: " << num_points_before - num_points_after << endl;
+
+        // Mark the keyframe as filtered
+        keyframe->filtered = true;
+      }*/
+
     int num_processed = 0;
     // ********** Select number of keyframess to be optimized **********
     for(int i = 0; i < std::min<int>(keyframe_queue.size(), max_keyframes_per_update); i++) {
@@ -540,6 +637,8 @@ private:
       // new_keyframess will be tested later for loop closure
       new_keyframes.push_back(keyframe);
 
+      //cout << "new_keyframes size: " << new_keyframes.size() << "num processed: " << num_processed << "keyframe empty: " << keyframes.empty() << endl;
+
       // add pose node
       Eigen::Isometry3d odom = odom2map * keyframe->odom_scan2scan;
       // ********** Vertex of keyframess is contructed here ***********
@@ -548,7 +647,9 @@ private:
 
       // fix the first node
       if(keyframes.empty() && new_keyframes.size() == 1) {
+        //cout << "aaaaa" << endl;
         if(private_nh.param<bool>("fix_first_node", false)) {
+          //cout << "bbbbb" << endl;
           Eigen::MatrixXd inf = Eigen::MatrixXd::Identity(6, 6);
           std::stringstream sst(private_nh.param<std::string>("fix_first_node_stddev", "1 1 1 1 1 1"));
           for(int i = 0; i < 6; i++) {
@@ -626,12 +727,18 @@ private:
       read_until_pub.publish(read_until);
     }
 
-    if(!keyframe_updated & !flush_gps_queue() & !flush_barometer_queue()) {
-      return;
-    }
+    //if(!keyframe_updated & !flush_gps_queue() & !flush_barometer_queue()) {
+    //  return;
+    //}
     
     // loop detection
     if(private_nh.param<bool>("enable_loop_closure", false)){
+      /*if (!keyframes.empty() && keyframes.back()) {
+        const auto& test_keyframe = keyframes.back();
+        cout << "Loop Detection HERE. Are Keyframes filtered: " << test_keyframe->filtered << endl;
+      } else {
+        cout << "Keyframes are empty or last keyframe is null" << endl;
+      }*/
       std::vector<Loop::Ptr> loops = loop_detector->detect(keyframes, new_keyframes, *graph_slam);
     }
 
@@ -662,6 +769,7 @@ private:
     // RadarOdom_to_base = map_to_base * map_to_RadarOdom^(-1)
     Eigen::Isometry3d trans = keyframe->node->estimate() * keyframe->odom_scan2scan.inverse();
     Eigen::Isometry3d map2base_trans = keyframe->node->estimate();
+
     trans_odom2map_mutex.lock();
     trans_odom2map = trans.matrix();
     // map2base_incremental = map2base_last^(-1) * map2base_this 
@@ -699,6 +807,7 @@ private:
 
   void addLoopFactor()
   {
+    //cout << "Add Loop Factor HERE" << endl;
     if (loop_detector->loopIndexQueue.empty())
       return;
     for (int i = 0; i < (int)loop_detector->loopIndexQueue.size(); ++i){
@@ -732,6 +841,28 @@ private:
     if(!cloud) {
       return;
     }
+
+    /*// Initialize TransformListener
+    static tf::TransformListener listener;
+    tf::StampedTransform transform;
+    try {
+      listener.lookupTransform(mapFrame, baselinkFrame, ros::Time(0), transform);
+    } catch (tf::TransformException &ex) {
+      ROS_WARN("%s", ex.what());
+      return;
+    }
+
+    // Get the z-coordinate of the baselink frame
+    double baselink_z = transform.getOrigin().z();
+
+    // Filter points below the height of the baselink frame
+    cout << "Filter Points below z: " << baselink_z - 1.0 << endl;
+    pcl::PassThrough<PointT> pass;
+    pass.setInputCloud(cloud);
+    pass.setFilterFieldName("z");
+    pass.setFilterLimits( -7.0, std::numeric_limits<float>::max()); // Set the lower limit to baselink_z
+    pass.filter(*cloud); // Apply the filter directly to the existing cloud*/
+
     cloud->header.frame_id = mapFrame;
     cloud->header.stamp = snapshot.back()->cloud->header.stamp;
 
@@ -1068,7 +1199,7 @@ private:
     return true;
   }
 
-  void nmea_callback(const nmea_msgs::SentenceConstPtr& nmea_msg) {
+  /*void nmea_callback(const nmea_msgs::SentenceConstPtr& nmea_msg) {
     GPRMC grmc = nmea_parser->parse(nmea_msg->sentence);
     if(grmc.status != 'A')
       return;
@@ -1090,23 +1221,23 @@ private:
     gps_msg.position_covariance_type = navsat_msg->position_covariance_type;
     gps_msg.status = navsat_msg->status;
     gps_navsat_queue.push_back(gps_msg);
-  }
+  }*/
 
   /**
    * @brief received gps data is added to #gps_queue_
    * @param gps_msg
    */
-  void gps_callback(const geographic_msgs::GeoPointStampedPtr& gps_msg) {
+  /*void gps_callback(const geographic_msgs::GeoPointStampedPtr& gps_msg) {
     std::lock_guard<std::mutex> lock(gps_queue_mutex);
     gps_msg->header.stamp += ros::Duration(gps_time_offset);
     gps_geopoint_queue.push_back(gps_msg);
-  }
+  }*/
 
   /**
    * @brief
    * @return
    */
-  bool flush_gps_queue() {
+  /*bool flush_gps_queue() {
     std::lock_guard<std::mutex> lock(gps_queue_mutex);
 
     if(keyframes.empty() || gps_navsat_queue.empty()) {
@@ -1185,7 +1316,7 @@ private:
     gps_navsat_queue.erase(gps_navsat_queue.begin(), remove_loc);
     
     return updated;
-  }
+  }*/
   
   void command_callback(const std_msgs::String& str_msg) {
     if (str_msg.data == "output_aftmapped") {
@@ -1246,16 +1377,16 @@ private:
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> cloud_sub;
   std::unique_ptr<message_filters::Synchronizer<ApproxSyncPolicy>> sync;
 
-  ros::Subscriber barometer_sub;
-  ros::Subscriber gps_sub;
-  ros::Subscriber nmea_sub;
-  ros::Subscriber navsat_sub;
+  //ros::Subscriber barometer_sub;
+  //ros::Subscriber gps_sub;
+  //ros::Subscriber nmea_sub;
+  //ros::Subscriber navsat_sub;
 
-  ros::Subscriber imu_odom_sub;
-  ros::Subscriber imu_sub;
+  //ros::Subscriber imu_odom_sub;
+  //ros::Subscriber imu_sub;
   ros::Subscriber command_sub;
 
-  ros::Publisher imu_odom_pub;
+  //ros::Publisher imu_odom_pub;
   ros::Publisher markers_pub;
 
   std::mutex trans_odom2map_mutex;
@@ -1285,6 +1416,7 @@ private:
   double thisKeyframeTime;
   double lastKeyframeTime;
   size_t keyframe_index = 0;
+  bool subsurface_removal_filter;
 
   // IMU / Ego Velocity Integration
   bool enable_preintegration;

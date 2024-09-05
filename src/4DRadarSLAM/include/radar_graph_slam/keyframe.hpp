@@ -59,6 +59,8 @@ public:
   boost::optional<sensor_msgs::Imu> imu; // the IMU message close to keyframe_
 
   g2o::VertexSE3* node;  // node instance
+
+  bool filtered = false;  // New member to indicate if the keyframe has been filtered (points under ground)
 };
 
 /**

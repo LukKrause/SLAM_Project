@@ -8,7 +8,9 @@
 <arg name="path" default="/home/lukas-krause/Datasets/Radar_SLAM/"/>
 
 <arg name = "file_0" default = "carpark_single/cp_2022-02-26.bag"/>
-<arg name = "file_0_stripped" default = "carpark_single/cp_2022-02-26_stripped.bag"/>
+<arg name = "file_0_stripped" default = "carpark_single/cp_2022-02-26_only_radar.bag"/>
+<arg name = "file_default_waveye_0" default = "rosbags/waveye_mcap_file_loop.bag"/>
+<arg name = "file_default_waveye_1" default = "rosbags/2024-09-02-21-51-04.bag"/>
 <arg name = "file_1" default = "carpark_400/carpark1_2023-02-01.bag"/>
 <arg name = "file_2" default = "carpark_400/carpark8_normal_2023-01-14.bag"/>
 <arg name = "file_3" default = "carpark_400/carpark0_normal_2023-01-14.bag"/>
@@ -18,11 +20,11 @@
 
 <!-- Plays the dataset. WARNING: changing 'rate' will cause interactions with the demo.  -->
 <!--  /radar_pcl /radar_trk -->
-<!--/barometer/filtered /vectornav/imu -->
+<!--/radar_enhanced_pcl /rgb_cam/image_raw/compressed /barometer/filtered /vectornav/imu -->
 <node pkg="rosbag" type="play" name="player"
     args = "-s 0.5 --clock --rate=3 --duration=10000
     $(arg path)$(arg file_0_stripped)
-    --topic /radar_enhanced_pcl /rgb_cam/image_raw/compressed
+    --topic /radar_enhanced_pcl
     ">
 </node>
 

@@ -87,7 +87,7 @@ public:
     points_sub.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(mt_nh, "/filtered_points", 32));
     sync.reset(new message_filters::Synchronizer<ApproxSyncPolicy>(ApproxSyncPolicy(32), *ego_vel_sub, *points_sub));
     sync->registerCallback(boost::bind(&ScanMatchingOdometryNodelet::pointcloud_callback, this, _1, _2));
-    imu_sub = nh.subscribe("/imu", 1024, &ScanMatchingOdometryNodelet::imu_callback, this);
+    //imu_sub = nh.subscribe("/imu", 1024, &ScanMatchingOdometryNodelet::imu_callback, this);
     command_sub = nh.subscribe("/command", 10, &ScanMatchingOdometryNodelet::command_callback, this);
 
     //******** Publishers **********
@@ -164,7 +164,7 @@ private:
     registration_s2m = select_registration_method(pnh);
   }
 
-  void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
+  /*void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
     
     Eigen::Quaterniond imu_quat_from(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
     Eigen::Quaterniond imu_quat_deskew = imu_quat_from * extQRPY;
@@ -201,9 +201,9 @@ private:
       cnt = 1;
     }
     
-  }
+  }*/
 
-  bool flush_imu_queue() {
+  /*bool flush_imu_queue() {
     std::lock_guard<std::mutex> lock(imu_queue_mutex);
     if(keyframes.empty() || imu_queue.empty()) {
       return false;
@@ -246,9 +246,9 @@ private:
     auto remove_loc = std::upper_bound(imu_queue.begin(), imu_queue.end(), keyframes.back()->stamp, [=](const ros::Time& stamp, const sensor_msgs::ImuConstPtr& imupoint) { return stamp < imupoint->header.stamp; });
     imu_queue.erase(imu_queue.begin(), remove_loc);
     return updated;
-  }
+  }*/
 
-  std::pair<bool, sensor_msgs::Imu> get_closest_imu(ros::Time frame_stamp) {
+  /*std::pair<bool, sensor_msgs::Imu> get_closest_imu(ros::Time frame_stamp) {
     sensor_msgs::Imu imu_;
     std::pair<bool, sensor_msgs::Imu> false_result {false, imu_};
     if(keyframes.empty() || imu_queue.empty())
@@ -281,10 +281,10 @@ private:
     // cout << (*closest_imu)->orientation <<endl;
     std::pair<bool, sensor_msgs::Imu> result {updated, imu_};
     return result;
-  }
+  }*/
 
 
-  void transformUpdate(Eigen::Matrix4d& odom_to_update) // IMU
+  /*void transformUpdate(Eigen::Matrix4d& odom_to_update) // IMU
   {
 		if (imuPointerLast >= 0) 
     {
@@ -338,7 +338,7 @@ private:
             // << ". Roll Pitch increment: " << RAD2DEG(roll_fused - ypr_odom(2)) << " " << RAD2DEG(pitch_fused - ypr_odom(1)) 
             << endl;
 		}
-  }
+  }*/
 
   /**
    * @brief callback for point clouds
@@ -499,7 +499,8 @@ private:
 
       if (enable_imu_thresholding) {
         // Use IMU orientation to determine whether the matching result is good or not
-        sensor_msgs::Imu frame_imu;
+        cout << "IMU thresholding Function, no IMU used!" << endl;
+        /*sensor_msgs::Imu frame_imu;
         Eigen::Matrix3d rot_imu = Eigen::Matrix3d::Identity();
         auto result = get_closest_imu(stamp);
         if (result.first) {
@@ -516,7 +517,7 @@ private:
           da = fabs(std::acos(Eigen::Quaterniond(rot_rd.inverse() * rot_imu).w()))*180/M_PI;
           delta_rot_imu = fabs(std::acos(Eigen::Quaterniond(rot_imu).w()))*180/M_PI;
           last_frame_imu = frame_imu;
-        }
+        }*/
         delta_trans_egovel = egovel_cum.block<3,1>(0,3).cast<double>();
         Eigen::Vector3d delta_trans_radar = radar_delta.block<3,1>(0,3).cast<double>();
         dx = (delta_trans_egovel - delta_trans_radar).norm();
@@ -567,8 +568,9 @@ private:
     if(keyframe_updater->decide(Eigen::Isometry3d(odom_s2s_now), stamp)) {
       // Loose Coupling the IMU roll & pitch
       if (enable_imu_fusion){
-        if(enable_scan_to_map) transformUpdate(odom_s2m_now);
-        else transformUpdate(odom_s2s_now);
+        cout << "IMU fusion Function, no IMU used!" << endl;
+        //if(enable_scan_to_map) transformUpdate(odom_s2m_now);
+        //else transformUpdate(odom_s2s_now);
       }
 
       keyframe_cloud_s2s = filtered;
@@ -584,7 +586,7 @@ private:
       keyframes.push_back(keyframe);
 
       // record keyframe's imu
-      flush_imu_queue();
+      //flush_imu_queue();
 
       if (enable_scan_to_map){
         pcl::PointCloud<PointT>::Ptr submap_cloud(new pcl::PointCloud<PointT>());
@@ -706,7 +708,7 @@ private:
   // ros::Subscriber points_sub;
   ros::Subscriber msf_pose_sub;
   ros::Subscriber msf_pose_after_update_sub;
-  ros::Subscriber imu_sub;
+  //ros::Subscriber imu_sub;
 
   std::mutex imu_queue_mutex;
   std::deque<sensor_msgs::ImuConstPtr> imu_queue;

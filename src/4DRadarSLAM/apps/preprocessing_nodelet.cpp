@@ -59,13 +59,13 @@ public:
     initializeParams();
 
     points_sub = nh.subscribe(pointCloudTopic, 64, &PreprocessingNodelet::cloud_callback, this);
-    imu_sub = nh.subscribe(imuTopic, 1, &PreprocessingNodelet::imu_callback, this);
+    //imu_sub = nh.subscribe(imuTopic, 1, &PreprocessingNodelet::imu_callback, this);
     command_sub = nh.subscribe("/command", 10, &PreprocessingNodelet::command_callback, this);
 
     points_pub = nh.advertise<sensor_msgs::PointCloud2>("/filtered_points", 32);
     colored_pub = nh.advertise<sensor_msgs::PointCloud2>("/colored_points", 32);
-    imu_pub = nh.advertise<sensor_msgs::Imu>("/imu", 32);
-    gt_pub = nh.advertise<nav_msgs::Odometry>("/aftmapped_to_init", 16);
+    //imu_pub = nh.advertise<sensor_msgs::Imu>("/imu", 32);
+    //gt_pub = nh.advertise<nav_msgs::Odometry>("/aftmapped_to_init", 16);
   
     std::string topic_twist = private_nh.param<std::string>("topic_twist", "/eagle_data/twist");
     std::string topic_inlier_pc2 = private_nh.param<std::string>("topic_inlier_pc2", "/eagle_data/inlier_pc2");
@@ -162,6 +162,7 @@ private:
     }
 
     use_distance_filter = private_nh.param<bool>("use_distance_filter", true);
+    subsurface_removal_filter = private_nh.param<bool>("subsurface_removal_filter", true);
     distance_near_thresh = private_nh.param<double>("distance_near_thresh", 1.0);
     distance_far_thresh = private_nh.param<double>("distance_far_thresh", 100.0);
     z_low_thresh = private_nh.param<double>("z_low_thresh", -5.0);
@@ -205,7 +206,7 @@ private:
     file_in.close();
   }
 
-  void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
+  /*void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
     sensor_msgs::Imu imu_data;
     imu_data.header.stamp = imu_msg->header.stamp;
     imu_data.header.seq = imu_msg->header.seq;
@@ -233,7 +234,7 @@ private:
     imu_data.linear_acceleration.x = imu_msg->linear_acceleration.x;
     imu_data.linear_acceleration.y = -imu_msg->linear_acceleration.y;
     imu_data.linear_acceleration.z = -imu_msg->linear_acceleration.z;
-    imu_pub.publish(imu_data);
+    //imu_pub.publish(imu_data);
     // imu_queue.push_back(imu_msg);
     double time_now = imu_msg->header.stamp.toSec();
     bool updated = false;
@@ -260,9 +261,9 @@ private:
         tf_broadcaster.sendTransform(tf_msg);
       }
       
-      gt_pub.publish(odom_msgs.front());
+      //gt_pub.publish(odom_msgs.front());
     }
-  }
+  }*/
 
   void cloud_callback(const sensor_msgs::PointCloud::ConstPtr&  eagle_msg) { // const pcl::PointCloud<PointT>& src_cloud_r
     
@@ -370,7 +371,11 @@ private:
     pcl::PointCloud<PointT>::ConstPtr filtered = distance_filter(src_cloud);
     // filtered = passthrough(filtered);
     filtered = downsample(filtered);
+    //cout << "Downsample done" << endl;
     filtered = outlier_removal(filtered);
+    //cout << "Outlier removal done" << endl;
+    //filtered = subsurface_point_removal(filtered);
+    //cout << "Subsurface removal done" << endl;
 
     // Distance Histogram
     static size_t num_frame = 0;
@@ -435,6 +440,43 @@ private:
 
     return filtered;
   }
+
+  /*pcl::PointCloud<PointT>::ConstPtr subsurface_point_removal(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
+    if(!subsurface_removal_filter) {
+      cout << "Subsurface removal filter is disabled" << endl;
+      return cloud;
+    }
+
+    // Filter the point cloud based on the height of the baselink frame
+    static tf::TransformListener listener;
+    tf::StampedTransform transform;
+    try {
+        listener.lookupTransform(mapFrame, baselinkFrame, ros::Time(0), transform);
+    } catch (tf::TransformException &ex) {
+        ROS_WARN("%s", ex.what());
+        return cloud; // Rückgabe der unveränderten Punktwolke im Fehlerfall
+    }
+
+    // Get the z-coordinate of the baselink frame
+    double baselink_z = transform.getOrigin().z();
+    cout << "Removing Points under hight (z): " << baselink_z - 0.1 << endl;
+
+    size_t num_points_before = cloud->size();
+
+    // Filter the point cloud based on the height of the baselink frame
+    pcl::PassThrough<PointT> pass;
+    pass.setInputCloud(cloud);
+    pass.setFilterFieldName("z");
+    pass.setFilterLimits(baselink_z - 0.1, std::numeric_limits<float>::max()); // Set the lower limit to baselink_z
+    pcl::PointCloud<PointT>::Ptr filtered_cloud(new pcl::PointCloud<PointT>());
+    pass.filter(*filtered_cloud);
+
+    size_t num_points_after = filtered_cloud->size();
+    if (num_points_before != num_points_after)
+        cout << "Number of points filtered: " << num_points_before - num_points_after << endl;
+
+    return filtered_cloud->makeShared();
+  }*/
 
   pcl::PointCloud<PointT>::ConstPtr distance_filter(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
     pcl::PointCloud<PointT>::Ptr filtered(new pcl::PointCloud<PointT>());
@@ -577,20 +619,21 @@ private:
   ros::NodeHandle nh;
   ros::NodeHandle private_nh;
 
-  ros::Subscriber imu_sub;
+  //ros::Subscriber imu_sub;
   std::vector<sensor_msgs::ImuConstPtr> imu_queue;
   ros::Subscriber points_sub;
   
   ros::Publisher points_pub;
   ros::Publisher colored_pub;
-  ros::Publisher imu_pub;
-  ros::Publisher gt_pub;
+  //ros::Publisher imu_pub;
+  //ros::Publisher gt_pub;
 
   tf::TransformListener tf_listener;
   tf::TransformBroadcaster tf_broadcaster;
 
 
   bool use_distance_filter;
+  bool subsurface_removal_filter;
   double distance_near_thresh;
   double distance_far_thresh;
   double z_low_thresh;
