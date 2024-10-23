@@ -206,64 +206,6 @@ private:
     file_in.close();
   }
 
-  /*void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
-    sensor_msgs::Imu imu_data;
-    imu_data.header.stamp = imu_msg->header.stamp;
-    imu_data.header.seq = imu_msg->header.seq;
-    imu_data.header.frame_id = "imu_frame";
-    Eigen::Quaterniond q_ahrs(imu_msg->orientation.w,
-                              imu_msg->orientation.x,
-                              imu_msg->orientation.y,
-                              imu_msg->orientation.z);
-    Eigen::Quaterniond q_r = 
-        Eigen::AngleAxisd( M_PI, Eigen::Vector3d::UnitZ()) * 
-        Eigen::AngleAxisd( M_PI, Eigen::Vector3d::UnitY()) * 
-        Eigen::AngleAxisd( 0.00000, Eigen::Vector3d::UnitX());
-    Eigen::Quaterniond q_rr = 
-        Eigen::AngleAxisd( 0.00000, Eigen::Vector3d::UnitZ()) * 
-        Eigen::AngleAxisd( 0.00000, Eigen::Vector3d::UnitY()) * 
-        Eigen::AngleAxisd( M_PI, Eigen::Vector3d::UnitX());
-    Eigen::Quaterniond q_out =  q_r * q_ahrs * q_rr;
-    imu_data.orientation.w = q_out.w();
-    imu_data.orientation.x = q_out.x();
-    imu_data.orientation.y = q_out.y();
-    imu_data.orientation.z = q_out.z();
-    imu_data.angular_velocity.x = imu_msg->angular_velocity.x;
-    imu_data.angular_velocity.y = -imu_msg->angular_velocity.y;
-    imu_data.angular_velocity.z = -imu_msg->angular_velocity.z;
-    imu_data.linear_acceleration.x = imu_msg->linear_acceleration.x;
-    imu_data.linear_acceleration.y = -imu_msg->linear_acceleration.y;
-    imu_data.linear_acceleration.z = -imu_msg->linear_acceleration.z;
-    //imu_pub.publish(imu_data);
-    // imu_queue.push_back(imu_msg);
-    double time_now = imu_msg->header.stamp.toSec();
-    bool updated = false;
-    if (odom_msgs.size() != 0) {
-      while (odom_msgs.front().header.stamp.toSec() + 0.001 < time_now) {
-        std::lock_guard<std::mutex> lock(odom_queue_mutex);
-        odom_msgs.pop_front();
-        updated = true;
-        if (odom_msgs.size() == 0)
-          break;
-      }
-    }
-    if (updated == true && odom_msgs.size() > 0){
-      if (publish_tf) {
-        geometry_msgs::TransformStamped tf_msg;
-        tf_msg.child_frame_id = baselinkFrame;
-        tf_msg.header.frame_id = mapFrame;
-        tf_msg.header.stamp = odom_msgs.front().header.stamp;
-        // tf_msg.header.stamp = ros::Time().now();
-        tf_msg.transform.rotation = odom_msgs.front().pose.pose.orientation;
-        tf_msg.transform.translation.x = odom_msgs.front().pose.pose.position.x;
-        tf_msg.transform.translation.y = odom_msgs.front().pose.pose.position.y;
-        tf_msg.transform.translation.z = odom_msgs.front().pose.pose.position.z;
-        tf_broadcaster.sendTransform(tf_msg);
-      }
-      
-      //gt_pub.publish(odom_msgs.front());
-    }
-  }*/
 
   void cloud_callback(const sensor_msgs::PointCloud::ConstPtr&  eagle_msg) { // const pcl::PointCloud<PointT>& src_cloud_r
     
@@ -318,6 +260,10 @@ private:
         double time_used = double(end_ms - start_ms) / CLOCKS_PER_SEC;
         egovel_time.push_back(time_used);
         
+        // Set Z component to zero to avoid drift in Z direction
+        v_r.z() = 0.0;
+        sigma_v_r.z() = 0.0;
+        
         geometry_msgs::TwistWithCovarianceStamped twist;
         twist.header.stamp         = pc2_raw_msg.header.stamp;
         twist.twist.twist.linear.x = v_r.x();
@@ -331,6 +277,9 @@ private:
         pub_twist.publish(twist);
         pub_inlier_pc2.publish(inlier_radar_msg);
         pub_outlier_pc2.publish(outlier_radar_msg);
+
+        // cout << "Ego velocity: " << v_r.transpose() << " m/s" << endl;
+        // cout << "Linear translation: x " << v_r.x() << " y " << v_r.y() << " z " << v_r.z() << endl;
 
     }
     else{;}
@@ -349,7 +298,7 @@ private:
       return;
     }
 
-    src_cloud = deskewing(src_cloud);
+    //src_cloud = deskewing(src_cloud);
 
     // if baselinkFrame is defined, transform the input cloud to the frame
     if(!baselinkFrame.empty()) {
@@ -399,7 +348,7 @@ private:
     PointT pt;
     for(int i = 0; i < cloud->size(); i++){
       if (cloud->at(i).z < 10 && cloud->at(i).z > -2){
-        pt.x = (*cloud)[i].x;
+        pt.x = (*cloud)[i].x; //downsample
         pt.y = (*cloud)[i].y;
         pt.z = (*cloud)[i].z;
         pt.intensity = (*cloud)[i].intensity;
@@ -441,42 +390,6 @@ private:
     return filtered;
   }
 
-  /*pcl::PointCloud<PointT>::ConstPtr subsurface_point_removal(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
-    if(!subsurface_removal_filter) {
-      cout << "Subsurface removal filter is disabled" << endl;
-      return cloud;
-    }
-
-    // Filter the point cloud based on the height of the baselink frame
-    static tf::TransformListener listener;
-    tf::StampedTransform transform;
-    try {
-        listener.lookupTransform(mapFrame, baselinkFrame, ros::Time(0), transform);
-    } catch (tf::TransformException &ex) {
-        ROS_WARN("%s", ex.what());
-        return cloud; // Rückgabe der unveränderten Punktwolke im Fehlerfall
-    }
-
-    // Get the z-coordinate of the baselink frame
-    double baselink_z = transform.getOrigin().z();
-    cout << "Removing Points under hight (z): " << baselink_z - 0.1 << endl;
-
-    size_t num_points_before = cloud->size();
-
-    // Filter the point cloud based on the height of the baselink frame
-    pcl::PassThrough<PointT> pass;
-    pass.setInputCloud(cloud);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits(baselink_z - 0.1, std::numeric_limits<float>::max()); // Set the lower limit to baselink_z
-    pcl::PointCloud<PointT>::Ptr filtered_cloud(new pcl::PointCloud<PointT>());
-    pass.filter(*filtered_cloud);
-
-    size_t num_points_after = filtered_cloud->size();
-    if (num_points_before != num_points_after)
-        cout << "Number of points filtered: " << num_points_before - num_points_after << endl;
-
-    return filtered_cloud->makeShared();
-  }*/
 
   pcl::PointCloud<PointT>::ConstPtr distance_filter(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
     pcl::PointCloud<PointT>::Ptr filtered(new pcl::PointCloud<PointT>());
@@ -504,68 +417,7 @@ private:
     return filtered;
   }
 
-  pcl::PointCloud<PointT>::ConstPtr deskewing(const pcl::PointCloud<PointT>::ConstPtr& cloud) {
-    ros::Time stamp = pcl_conversions::fromPCL(cloud->header.stamp);
-    if(imu_queue.empty()) {
-      return cloud;
-    }
 
-    // the color encodes the point number in the point sequence
-    if(colored_pub.getNumSubscribers()) {
-      pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored(new pcl::PointCloud<pcl::PointXYZRGB>());
-      colored->header = cloud->header;
-      colored->is_dense = cloud->is_dense;
-      colored->width = cloud->width;
-      colored->height = cloud->height;
-      colored->resize(cloud->size());
-
-      for(int i = 0; i < cloud->size(); i++) {
-        double t = static_cast<double>(i) / cloud->size();
-        colored->at(i).getVector4fMap() = cloud->at(i).getVector4fMap();
-        colored->at(i).r = 255 * t;
-        colored->at(i).g = 128;
-        colored->at(i).b = 255 * (1 - t);
-      }
-      colored_pub.publish(*colored);
-    }
-
-    sensor_msgs::ImuConstPtr imu_msg = imu_queue.front();
-
-    auto loc = imu_queue.begin();
-    for(; loc != imu_queue.end(); loc++) {
-      imu_msg = (*loc);
-      if((*loc)->header.stamp > stamp) {
-        break;
-      }
-    }
-
-    imu_queue.erase(imu_queue.begin(), loc);
-
-    Eigen::Vector3f ang_v(imu_msg->angular_velocity.x, imu_msg->angular_velocity.y, imu_msg->angular_velocity.z);
-    ang_v *= -1;
-
-    pcl::PointCloud<PointT>::Ptr deskewed(new pcl::PointCloud<PointT>());
-    deskewed->header = cloud->header;
-    deskewed->is_dense = cloud->is_dense;
-    deskewed->width = cloud->width;
-    deskewed->height = cloud->height;
-    deskewed->resize(cloud->size());
-
-    double scan_period = private_nh.param<double>("scan_period", 0.1);
-    for(int i = 0; i < cloud->size(); i++) {
-      const auto& pt = cloud->at(i);
-
-      // TODO: transform IMU data into the LIDAR frame
-      double delta_t = scan_period * static_cast<double>(i) / cloud->size();
-      Eigen::Quaternionf delta_q(1, delta_t / 2.0 * ang_v[0], delta_t / 2.0 * ang_v[1], delta_t / 2.0 * ang_v[2]);
-      Eigen::Vector3f pt_ = delta_q.inverse() * pt.getVector3fMap();
-
-      deskewed->at(i) = cloud->at(i);
-      deskewed->at(i).getVector3fMap() = pt_;
-    }
-
-    return deskewed;
-  }
 
   bool RadarRaw2PointCloudXYZ(const pcl::PointCloud<RadarPointCloudType>::ConstPtr &raw, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudxyz)
   {

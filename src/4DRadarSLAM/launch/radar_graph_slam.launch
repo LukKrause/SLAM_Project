@@ -10,13 +10,13 @@
   <arg name="enable_barometer" default="false" /> <!-- barometer altitude constraint, not used -->
   <arg name="barometer_edge_type" default="1" /> <!-- not used -->
   <arg name="enable_gps" default="false" />
-  <arg name="enable_dynamic_object_removal" default="false" />
-  <arg name="enable_frontend_ego_vel" default="false" />
-  <arg name="enable_preintegration" default="false" /> <!-- not used -->
+  <arg name="enable_dynamic_object_removal" default="false" /> <!-- CHANGED -->
+  <arg name="enable_frontend_ego_vel" default="false" /> <!-- CHANGED -->
+  <arg name="enable_preintegration" default="false" /> <!-- not used --> <!-- CHANGED -->
 
-  <arg name="keyframe_delta_trans_front_end" default="0.5" />
-  <arg name="keyframe_delta_trans_back_end" default="2" /><!-- 1 2 -->
-  <arg name="keyframe_delta_angle" default="0.2612" /><!-- 10°: 0.1745 15°: 0.2612 -->
+  <arg name="keyframe_delta_trans_front_end" default="0.5" /> <!-- 0.5 -->
+  <arg name="keyframe_delta_trans_back_end" default="1" /> <!-- 1 2 -->
+  <arg name="keyframe_delta_angle" default="0,0873" /><!-- 5°: 0,0873 10°: 0.1745 15°: 0.2612 -->
 
   <arg name="enable_transform_thresholding" default="true" />
   <arg name="enable_loop_closure" default="true" />
@@ -45,8 +45,8 @@
     <param name="use_distance_filter" value="true" />
     <param name="distance_near_thresh" value="2" />
     <param name="distance_far_thresh" value="100.0" />
-    <param name="z_low_thresh" value="-100.0" />
-    <param name="z_high_thresh" value="100.0" />
+    <param name="z_low_thresh" value="-2.0" /> <!-- CHANGED -100-->
+    <param name="z_high_thresh" value="4.5" /> <!-- CHANGED 100-->
     <!-- NONE, VOXELGRID(0.1), or APPROX_VOXELGRID -->
     <param name="downsample_method" value="VOXELGRID" />
     <param name="downsample_resolution" value="0.1" />
@@ -122,24 +122,24 @@
     <param name="keyframe_min_size" value="500" />
     <!-- fix first node for optimization stability -->
     <param name="fix_first_node" value="true"/>
-    <param name="fix_first_node_stddev" value="10 10 10 1 1 1"/>
+    <param name="fix_first_node_stddev" value="10 10 10 1 1 1"/> <!-- 10 10 10 1 1 1 -->
     <param name="fix_first_node_adaptive" value="true"/>
     <!-- Scan Context Loop Closure params 15 25 15 2.5 -->
     <param name="enable_loop_closure" value="$(arg enable_loop_closure)"/>
     <param name="enable_pf" value="true"/> <!-- loop prefiltering -->
     <param name="enable_odom_check" value="true"/>
-    <param name="distance_thresh" value="10.0" />
-    <param name="accum_distance_thresh" value="50.0" /><!-- Minimum distance beteen two edges of the loop -->
-    <param name="min_loop_interval_dist" value="10.0" /><!-- Minimum distance between a new loop edge and the last one -->
-    <param name="distance_from_last_edge_thresh" value="10" />
+    <param name="distance_thresh" value="10.0" /> <!-- 10.0 -->
+    <param name="accum_distance_thresh" value="50.0" /><!-- Minimum distance beteen two edges of the loop --> <!-- 50.0 -->
+    <param name="min_loop_interval_dist" value="10.0" /><!-- Minimum distance between a new loop edge and the last one --> <!-- 10.0 -->
+    <param name="distance_from_last_edge_thresh" value="10" /> <!-- 10 -->
     <param name="max_baro_difference" value="2.0" /><!-- Maximum altitude difference beteen two edges' odometry -->
-    <param name="max_yaw_difference" value="20" /><!-- Maximum yaw difference beteen two edges' odometry -->
+    <param name="max_yaw_difference" value="20" /><!-- Maximum yaw difference beteen two edges' odometry --> <!-- 20.0 -->
     
-    <param name="sc_dist_thresh" value="0.5" /><!-- Matching score threshold of Scan Context 0.4-0.6 will be good -->
+    <param name="sc_dist_thresh" value="0.5" /><!-- Matching score threshold of Scan Context 0.4-0.6 will be good --> <!-- 0.5 , 0.9-->
     <param name="sc_azimuth_range" value="56.5" />
-    <param name="historyKeyframeFitnessScore" value="6" />
-    <param name="odom_check_trans_thresh" value="0.3" />
-    <param name="odom_check_rot_thresh" value="0.05" />
+    <param name="historyKeyframeFitnessScore" value="6" /> <!-- 6 , 20 -->
+    <param name="odom_check_trans_thresh" value="0.3" /> <!-- 0.3 -->
+    <param name="odom_check_rot_thresh" value="0.05" /> <!-- 0.05 -->
     <param name="pairwise_check_trans_thresh" value="1.5" />
     <param name="pairwise_check_rot_thresh" value="0.2" />
     <!-- scan matching params -->
@@ -170,7 +170,7 @@
     <param name="dataset_name" value="loop2" />
     <!-- Preintegration --> <!-- bad effect, not used -->
     <param name="enable_preintegration" value="$(arg enable_preintegration)" />
-      <param name="use_egovel_preinteg_trans" value="false" /><!-- Ego Velocity Integration - Translation -->
+      <param name="use_egovel_preinteg_trans" value="false" /><!-- Ego Velocity Integration - Translation --> <!-- CHANGED -->
       <param name="preinteg_orient_stddev" value="1" />
       <param name="preinteg_trans_stddev" value="5" />
     <!-- scan matching -->

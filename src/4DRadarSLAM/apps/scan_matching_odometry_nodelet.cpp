@@ -78,10 +78,10 @@ public:
 
     initialize_params(); // this
 
-    if(private_nh.param<bool>("enable_imu_frontend", false)) {
-      msf_pose_sub = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/msf_core/pose", 1, boost::bind(&ScanMatchingOdometryNodelet::msf_pose_callback, this, _1, false));
-      msf_pose_after_update_sub = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/msf_core/pose_after_update", 1, boost::bind(&ScanMatchingOdometryNodelet::msf_pose_callback, this, _1, true));
-    }
+    //if(private_nh.param<bool>("enable_imu_frontend", false)) {
+    //  msf_pose_sub = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/msf_core/pose", 1, boost::bind(&ScanMatchingOdometryNodelet::msf_pose_callback, this, _1, false));
+    //  msf_pose_after_update_sub = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/msf_core/pose_after_update", 1, boost::bind(&ScanMatchingOdometryNodelet::msf_pose_callback, this, _1, true));
+    //}
     //******** Subscribers **********
     ego_vel_sub.reset(new message_filters::Subscriber<geometry_msgs::TwistWithCovarianceStamped>(mt_nh, "/eagle_data/twist", 256));
     points_sub.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(mt_nh, "/filtered_points", 32));
@@ -164,181 +164,6 @@ private:
     registration_s2m = select_registration_method(pnh);
   }
 
-  /*void imu_callback(const sensor_msgs::ImuConstPtr& imu_msg) {
-    
-    Eigen::Quaterniond imu_quat_from(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
-    Eigen::Quaterniond imu_quat_deskew = imu_quat_from * extQRPY;
-    imu_quat_deskew.normalize();
-
-    double roll, pitch, yaw;
-    // tf::quaternionMsgToTF(imu_odom_msg->orientation, orientation);
-    tf::Quaternion orientation = tf::Quaternion(imu_quat_deskew.x(),imu_quat_deskew.y(),imu_quat_deskew.z(),imu_quat_deskew.w());
-    tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-    imuPointerLast = (imuPointerLast + 1) % imuQueLength;
-    imuTime[imuPointerLast] = imu_msg->header.stamp.toSec();
-    imuRoll[imuPointerLast] = roll;
-    imuPitch[imuPointerLast] = pitch;
-    // cout << "get imu rp: " << roll << " " << pitch << endl;
-
-    sensor_msgs::ImuPtr imu(new sensor_msgs::Imu);
-    imu->header = imu_msg->header;
-    imu->angular_velocity = imu_msg->angular_velocity; imu->linear_acceleration = imu_msg->linear_acceleration;
-    imu->angular_velocity_covariance = imu_msg->angular_velocity_covariance;
-    imu->linear_acceleration_covariance, imu_msg->linear_acceleration_covariance;
-    imu->orientation_covariance = imu_msg->orientation_covariance;
-    imu->orientation.w=imu_quat_deskew.w(); imu->orientation.x = imu_quat_deskew.x(); imu->orientation.y = imu_quat_deskew.y(); imu->orientation.z = imu_quat_deskew.z();
-    {
-      std::lock_guard<std::mutex> lock(imu_queue_mutex);
-      imu_queue.push_back(imu);
-    }
-
-    static int cnt = 0;
-    if(cnt == 0) {
-      geometry_msgs::Quaternion imuQuat = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, 0);
-      global_orient_matrix = Eigen::Quaterniond(imuQuat.w, imuQuat.x, imuQuat.y, imuQuat.z).toRotationMatrix();
-      ROS_INFO_STREAM("Initial IMU euler angles (RPY): "
-            << RAD2DEG(roll) << ", " << RAD2DEG(pitch) << ", " << RAD2DEG(yaw));
-      cnt = 1;
-    }
-    
-  }*/
-
-  /*bool flush_imu_queue() {
-    std::lock_guard<std::mutex> lock(imu_queue_mutex);
-    if(keyframes.empty() || imu_queue.empty()) {
-      return false;
-    }
-    bool updated = false;
-    auto imu_cursor = imu_queue.begin();
-
-    for(size_t i=0; i < keyframes.size(); i++) {
-      auto keyframe = keyframes.at(i);
-      if(keyframe->stamp < (*imu_cursor)->header.stamp) {
-        continue;
-      }
-      if(keyframe->stamp > imu_queue.back()->header.stamp) {
-        break;
-      }
-      // find the imu data which is closest to the keyframe_
-      auto closest_imu = imu_cursor;
-      for(auto imu = imu_cursor; imu != imu_queue.end(); imu++) {
-        auto dt = ((*closest_imu)->header.stamp - keyframe->stamp).toSec();
-        auto dt2 = ((*imu)->header.stamp - keyframe->stamp).toSec();
-        if(std::abs(dt) < std::abs(dt2)) {
-          break;
-        }
-        closest_imu = imu;
-      }
-      // if the time residual between the imu and keyframe_ is too large, skip it
-      imu_cursor = closest_imu;
-      if(0.2 < std::abs(((*closest_imu)->header.stamp - keyframe->stamp).toSec())) {
-        continue;
-      }
-      sensor_msgs::Imu imu_;
-      imu_.header = (*closest_imu)->header; imu_.orientation = (*closest_imu)->orientation;
-      imu_.angular_velocity = (*closest_imu)->angular_velocity; imu_.linear_acceleration = (*closest_imu)->linear_acceleration;
-      imu_.angular_velocity_covariance = (*closest_imu)->angular_velocity_covariance;
-      imu_.linear_acceleration_covariance = (*closest_imu)->linear_acceleration_covariance;
-      imu_.orientation_covariance = (*closest_imu)->orientation_covariance;
-      keyframe->imu = imu_;
-      updated = true;
-    }
-    auto remove_loc = std::upper_bound(imu_queue.begin(), imu_queue.end(), keyframes.back()->stamp, [=](const ros::Time& stamp, const sensor_msgs::ImuConstPtr& imupoint) { return stamp < imupoint->header.stamp; });
-    imu_queue.erase(imu_queue.begin(), remove_loc);
-    return updated;
-  }*/
-
-  /*std::pair<bool, sensor_msgs::Imu> get_closest_imu(ros::Time frame_stamp) {
-    sensor_msgs::Imu imu_;
-    std::pair<bool, sensor_msgs::Imu> false_result {false, imu_};
-    if(keyframes.empty() || imu_queue.empty())
-      return false_result;
-    bool updated = false;
-    auto imu_cursor = imu_queue.begin();
-    
-    // find the imu data which is closest to the keyframe_
-    auto closest_imu = imu_cursor;
-    for(auto imu = imu_cursor; imu != imu_queue.end(); imu++) {
-      auto dt = ((*closest_imu)->header.stamp - frame_stamp).toSec();
-      auto dt2 = ((*imu)->header.stamp - frame_stamp).toSec();
-      if(std::abs(dt) < std::abs(dt2)) {
-        break;
-      }
-      closest_imu = imu;
-    }
-    // if the time residual between the imu and keyframe_ is too large, skip it
-    imu_cursor = closest_imu;
-    if(0.2 < std::abs(((*closest_imu)->header.stamp - frame_stamp).toSec()))
-      return false_result;
-
-    imu_.header = (*closest_imu)->header; imu_.orientation = (*closest_imu)->orientation;
-    imu_.angular_velocity = (*closest_imu)->angular_velocity; imu_.linear_acceleration = (*closest_imu)->linear_acceleration;
-    imu_.angular_velocity_covariance = (*closest_imu)->angular_velocity_covariance; 
-    imu_.linear_acceleration_covariance = (*closest_imu)->linear_acceleration_covariance;
-    imu_.orientation_covariance = (*closest_imu)->orientation_covariance;
-
-    updated = true;
-    // cout << (*closest_imu)->orientation <<endl;
-    std::pair<bool, sensor_msgs::Imu> result {updated, imu_};
-    return result;
-  }*/
-
-
-  /*void transformUpdate(Eigen::Matrix4d& odom_to_update) // IMU
-  {
-		if (imuPointerLast >= 0) 
-    {
-      // cout << "    ";
-      float imuRollLast = 0, imuPitchLast = 0;
-      while (imuPointerFront != imuPointerLast) {
-        if (timeLaserOdometry + scanPeriod < imuTime[imuPointerFront]) {
-          break;
-        }
-        imuPointerFront = (imuPointerFront + 1) % imuQueLength;
-      }
-      cout << "    ";
-      if (timeLaserOdometry + scanPeriod > imuTime[imuPointerFront]) {
-        imuRollLast = imuRoll[imuPointerFront];
-        imuPitchLast = imuPitch[imuPointerFront];
-        cout << "    ";
-      }
-      else {
-        cout << "    ";
-        int imuPointerBack = (imuPointerFront + imuQueLength - 1) % imuQueLength;
-        float ratioFront = (timeLaserOdometry + scanPeriod - imuTime[imuPointerBack])
-                          / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-        float ratioBack = (imuTime[imuPointerFront] - timeLaserOdometry - scanPeriod) 
-                        / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-
-        imuRollLast = imuRoll[imuPointerFront] * ratioFront + imuRoll[imuPointerBack] * ratioBack;
-        imuPitchLast = imuPitch[imuPointerFront] * ratioFront + imuPitch[imuPointerBack] * ratioBack;
-      }
-      
-      Eigen::Matrix3d matr = odom_to_update.block<3, 3>(0, 0);
-      // Eigen::Vector3d xyz = odom_to_update.block<3, 1>(0, 3);
-      Eigen::Vector3d ypr_odom = R2ypr(matr.block<3,3>(0,0));
-      geometry_msgs::Quaternion imuQuat = tf::createQuaternionMsgFromRollPitchYaw(imuRollLast, imuPitchLast, ypr_odom(0));
-      Eigen::Matrix3d imu_rot = Eigen::Matrix3d(Eigen::Quaterniond(imuQuat.w, imuQuat.x, imuQuat.y, imuQuat.z));
-      Eigen::Vector3d ypr_imu = R2ypr(imu_rot);
-      // IMU orientation transformed from world coordinate to map coordinate
-      Eigen::Matrix3d imu_rot_transed = global_orient_matrix.inverse() * imu_rot;
-      Eigen::Vector3d ypr_imu_trans = R2ypr(imu_rot_transed);
-      double& yaw_ = ypr_odom(0);
-      double pitch_fused = (1 - imu_fusion_ratio) * ypr_odom(1) + imu_fusion_ratio * ypr_imu_trans(1);
-      double roll_fused = (1 - imu_fusion_ratio) * ypr_odom(2) + imu_fusion_ratio * ypr_imu_trans(2);
-      geometry_msgs::Quaternion rosQuat = tf::createQuaternionMsgFromRollPitchYaw(roll_fused, pitch_fused, yaw_);
-      Eigen::Quaterniond quat_updated = Eigen::Quaterniond(rosQuat.w, rosQuat.x, rosQuat.y, rosQuat.z);
-      odom_to_update.block<3, 3>(0, 0) = quat_updated.toRotationMatrix();
-
-      if (imu_debug_out)
-        cout << "IMU rp: " << RAD2DEG(ypr_imu(2)) << " " << RAD2DEG(ypr_imu(1))
-            << ". IMU transed rp: " << RAD2DEG(ypr_imu_trans(2)) << " " << RAD2DEG(ypr_imu_trans(1))
-            // << ". Odom rp: " << RAD2DEG(ypr_odom(2)) << " " << RAD2DEG(ypr_odom(1))
-            // << ". Updated rp: " << RAD2DEG(roll_fused) << " " << RAD2DEG(pitch_fused)
-            // << ". Roll Pitch increment: " << RAD2DEG(roll_fused - ypr_odom(2)) << " " << RAD2DEG(pitch_fused - ypr_odom(1)) 
-            << endl;
-		}
-  }*/
 
   /**
    * @brief callback for point clouds
@@ -500,42 +325,7 @@ private:
       if (enable_imu_thresholding) {
         // Use IMU orientation to determine whether the matching result is good or not
         cout << "IMU thresholding Function, no IMU used!" << endl;
-        /*sensor_msgs::Imu frame_imu;
-        Eigen::Matrix3d rot_imu = Eigen::Matrix3d::Identity();
-        auto result = get_closest_imu(stamp);
-        if (result.first) {
-          frame_imu = result.second;
-          Eigen::Quaterniond imu_quat(frame_imu.orientation.w, frame_imu.orientation.x, frame_imu.orientation.y, frame_imu.orientation.z);
-          Eigen::Quaterniond prev_imu_quat(last_frame_imu.orientation.w, last_frame_imu.orientation.x, last_frame_imu.orientation.y, last_frame_imu.orientation.z);
-          rot_imu = (prev_imu_quat.inverse() * imu_quat).toRotationMatrix();
-          Eigen::Vector3d eulerAngle_imu = rot_imu.eulerAngles(0,1,2); // roll pitch yaw
-          Eigen::Vector3d eulerAngle_rd = last_radar_delta.block<3,3>(0,0).eulerAngles(0,1,2);
-          Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(restrict_rad(eulerAngle_imu(0)),Eigen::Vector3d::UnitX()));
-          Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(restrict_rad(eulerAngle_imu(1)),Eigen::Vector3d::UnitY()));
-          Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(restrict_rad(eulerAngle_rd(2)),Eigen::Vector3d::UnitZ()));
-          matrix_rot = yawAngle * pitchAngle * rollAngle;
-          da = fabs(std::acos(Eigen::Quaterniond(rot_rd.inverse() * rot_imu).w()))*180/M_PI;
-          delta_rot_imu = fabs(std::acos(Eigen::Quaterniond(rot_imu).w()))*180/M_PI;
-          last_frame_imu = frame_imu;
-        }*/
-        delta_trans_egovel = egovel_cum.block<3,1>(0,3).cast<double>();
-        Eigen::Vector3d delta_trans_radar = radar_delta.block<3,1>(0,3).cast<double>();
-        dx = (delta_trans_egovel - delta_trans_radar).norm();
-
-        if (dx > max_diff_trans || da > max_diff_angle || too_large_trans) {
-          Eigen::Matrix4d mat_est(Eigen::Matrix4d::Identity());
-          mat_est.block<3, 3>(0, 0) = matrix_rot;
-          mat_est.block<3, 1>(0, 3) = delta_trans_egovel;
-          if (too_large_trans) cout << "Too large transform! " << dx_rd << "[m] " << da_rd << "[deg] ";
-          cout << "Difference of Odom and IMU/EgoVel too large " << dx << "[m] " << da << "[deg] (" << stamp << ")" << endl;
-          prev_trans_s2s = prev_trans_s2s * mat_est;
-          thresholded = true;
-          if (enable_scan_to_map){
-            prev_trans_s2m = prev_trans_s2m * mat_est;
-            odom_s2m_now = keyframe_pose_s2m * prev_trans_s2m;
-          }
-          else odom_s2s_now = keyframe_pose_s2s * prev_trans_s2s;
-        }
+        
       }
       else {
         if (too_large_trans) {
@@ -588,7 +378,7 @@ private:
       // record keyframe's imu
       //flush_imu_queue();
 
-      if (enable_scan_to_map){
+      /*if (enable_scan_to_map){
         pcl::PointCloud<PointT>::Ptr submap_cloud(new pcl::PointCloud<PointT>());
         pcl::PointCloud<PointT>::ConstPtr submap_cloud_downsampled;
         for(size_t i=std::max(0, (int)keyframes.size()-max_submap_frames); i < keyframes.size()-1; i++){
@@ -604,7 +394,7 @@ private:
         keyframes.back()->odom_scan2map = Eigen::Isometry3d(odom_s2m_now);
         keyframe_pose_s2m = odom_s2m_now;
         prev_trans_s2m.setIdentity();
-      }
+      }*/
     }
     
     if (aligned_points_pub.getNumSubscribers() > 0)
@@ -629,6 +419,25 @@ private:
   void publish_odometry(const ros::Time& stamp, const std::string& father_frame_id, const std::string& child_frame_id, const Eigen::Matrix4d& pose_in, const geometry_msgs::TwistWithCovariance twist_in) {
     // publish transform stamped for IMU integration
     geometry_msgs::TransformStamped odom_trans = matrix2transform(stamp, pose_in, father_frame_id, child_frame_id); //"map" 
+    
+    // Apply constraints to the transform
+    odom_trans.transform.translation.z = 1.5; // Setze die Z-Translation auf 0
+    odom_trans.transform.rotation.x = 0.0;    // Setze die X-Rotation auf 0
+    odom_trans.transform.rotation.y = 0.0;    // Setze die Y-Rotation auf 0
+
+    // Normalize the quaternion to ensure it's valid
+    tf2::Quaternion quat(
+        odom_trans.transform.rotation.x,
+        odom_trans.transform.rotation.y,
+        odom_trans.transform.rotation.z,
+        odom_trans.transform.rotation.w
+    );
+    quat.normalize();
+    odom_trans.transform.rotation.x = quat.x();
+    odom_trans.transform.rotation.y = quat.y();
+    odom_trans.transform.rotation.z = quat.z();
+    odom_trans.transform.rotation.w = quat.w();
+
     trans_pub.publish(odom_trans);
 
     // broadcast the transform over TF
@@ -642,8 +451,15 @@ private:
 
     odom.pose.pose.position.x = pose_in(0, 3);
     odom.pose.pose.position.y = pose_in(1, 3);
-    odom.pose.pose.position.z = pose_in(2, 3);
+    odom.pose.pose.position.z = 1.5;          // pose_in(2, 3); Translation in Z vermeiden
     odom.pose.pose.orientation = odom_trans.transform.rotation;
+
+    //cout << "Odom pose original: x " << pose_in(0, 3) << " y " << pose_in(1, 3) << " z " << pose_in(2, 3) << endl;
+    //cout << "Odom pose changed : x " << odom.pose.pose.position.x << " y " << odom.pose.pose.position.y << " z " << odom.pose.pose.position.z << endl;
+    //cout << "Odom orientation: x " << odom.pose.pose.orientation.x
+    //      << " y " << odom.pose.pose.orientation.y
+    //      << " z " << odom.pose.pose.orientation.z
+    //      << " w " << odom.pose.pose.orientation.w << endl;
     odom.twist = twist_in;
 
     odom_pub.publish(odom);

@@ -32,7 +32,7 @@ struct RadarEgoVelocityEstimatorConfig
  float min_dist = 1;
  float max_dist = 400;
  float min_db = 10;
- float elevation_thresh_deg = 22.5;
+ float elevation_thresh_deg = 15; // verkleinern um die Bewegung/Geschw. in Z zu verringern 22.5
  float azimuth_thresh_deg = 56.5;
  float doppler_velocity_correction_factor = 1;
  
@@ -40,7 +40,7 @@ struct RadarEgoVelocityEstimatorConfig
  float allowed_outlier_percentage = 0.30;
  float sigma_zero_velocity_x = 1.0e-03; // default Standard Deviation
  float sigma_zero_velocity_y = 3.2e-03;
- float sigma_zero_velocity_z = 1.0e-02;
+ float sigma_zero_velocity_z = 1.0e-05; // verkleinern um die Bewegung/Geschw. in Z zu verringern  1.0e-02
  
  float sigma_offset_radar_x = 0;
  float sigma_offset_radar_y = 0;
@@ -48,7 +48,7 @@ struct RadarEgoVelocityEstimatorConfig
 
  float max_sigma_x = 0.2;
  float max_sigma_y = 0.2;
- float max_sigma_z = 0.2;
+ float max_sigma_z = 0.01; // verkleinern um die Bewegung/Geschw. in Z zu verringern  0.2
  float max_r_cond;
  bool use_cholesky_instead_of_bdcsvd = true;
 
